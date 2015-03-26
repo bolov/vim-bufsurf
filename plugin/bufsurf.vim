@@ -24,7 +24,7 @@ command BufSurfList :call <SID>BufSurfList()
 " List of buffer names that we should not track.
 let s:ignore_buffers = split(g:BufSurfIgnore, ',')
 
-" Indicates whether the plugin is enabled or not. 
+" Indicates whether the plugin is enabled or not
 let s:disabled = 0
 
 " Open the previous buffer in the navigation history for the current window.
@@ -34,9 +34,10 @@ function s:BufSurfBack()
         let s:disabled = 1
         execute "b " . w:history[w:history_index]
         let s:disabled = 0
-    else
-        call s:BufSurfEcho("reached start of window navigation history")
     endif
+
+    redraw
+    call s:BufSurfList()
 endfunction
 
 " Open the next buffer in the navigation history for the current window.
@@ -46,20 +47,22 @@ function s:BufSurfForward()
         let s:disabled = 1
         execute "b " . w:history[w:history_index]
         let s:disabled = 0
-    else
-        call s:BufSurfEcho("reached end of window navigation history")
     endif
+
+    redraw
+    call s:BufSurfList()
 endfunction
 
 function s:BufSurfPrintHistory()
+    if !exists('w:history_index')
+      return
+    endif
   echomsg "history: (idx " . w:history_index . ") " . join(w:history, ";")
 endfunction
 
 " Add the given buffer number to the navigation history for the window
 " identified by winnr.
 function s:BufSurfAppend(bufnr)
-    echom "BufSurfAppend " . a:bufnr
-    call s:BufSurfPrintHistory()
     " In case the specified buffer should be ignored, do not append it to the
     " navigation history of the window.
     if s:BufSurfIsDisabled(a:bufnr)
@@ -104,8 +107,6 @@ function s:BufSurfAppend(bufnr)
         let w:history = insert(w:history, a:bufnr, w:history_index)
     endif
 
-    call s:BufSurfPrintHistory()
-    echom "end append"
 endfunction
 
 " Displays buffer navigation history for the current window.
@@ -115,12 +116,12 @@ function s:BufSurfList()
     for l:bufnr in w:history
         let l:buffer_name = bufname(l:bufnr)
         if l:idx == w:history_index
-          let l:buffer_name .= l:buffer_name . "*"
+          let l:buffer_name .= "*"
         endif
         let l:buffer_names = l:buffer_names + [l:buffer_name]
         let l:idx += 1
     endfor
-    call s:BufSurfEcho("window buffer navigation history (* = current): " . join(l:buffer_names, ', '))
+    call s:BufSurfEcho("history: " . join(l:buffer_names, ', '), 0)
 endfunction
 
 " Returns whether recording the buffer navigation history is disabled for the
@@ -141,32 +142,34 @@ endfunction
 
 " Remove buffer with number bufnr from all navigation histories.
 function s:BufSurfDelete(bufnr)
-    echom "surf delete " . a:bufnr
-    echom "actually it is: " . expand('<afile>') . " - " . expand('<abuf>')
-    call s:BufSurfPrintHistory()
-
     if s:BufSurfIsDisabled(a:bufnr)
         return
     endif
 
-    " Remove the buffer from all window histories.
-    call filter(w:history, 'v:val !=' . a:bufnr)
+    " Remove the buffer; update index
+    let l:tail = filter(w:history[w:history_index + 1 : ], 'v:val != ' . a:bufnr)
+    let l:head = filter(w:history[0 : w:history_index], 'v:val != ' . a:bufnr)
 
-    echomsg join(w:history, ";")
+    let w:history_index = len(l:head) - 1
+    let w:history = l:head + l:tail
 
-    " In case the current window history index is no longer valid, move it within boundaries.
-    if w:history_index >= len(w:history)
-        let w:history_index = len(w:history) - 1
+    " the plugin BuffKill switches to the alternate buffer
+    " before wipping, so we make sure we don't have consecutive identical
+    " items in history
+    if w:history_index > 0 &&
+          \ w:history[w:history_index] == w:history[w:history_index - 1]
+      call remove(w:history, w:history_index)
+      let w:history_index -= 1
     endif
 
-    call s:BufSurfPrintHistory()
-    echo "end surf delete"
 endfunction
 
 " Echo a BufSurf message in the Vim status line.
-function s:BufSurfEcho(msg)
+function s:BufSurfEcho(msg, warn)
     if g:BufSurfMessages == 1
-        echohl WarningMsg
+        if a:warn == 1
+            echohl WarningMsg
+        endif
         echomsg 'BufSurf: ' . a:msg
         echohl None
     endif
@@ -178,5 +181,6 @@ augroup BufSurf
   autocmd BufEnter * :call s:BufSurfAppend(winbufnr(winnr()))
   autocmd WinEnter * :call s:BufSurfAppend(winbufnr(winnr()))
   " autocmd BufWipeout * :call s:BufSurfDelete(winbufnr(winnr()))
-  autocmd BufWipeout * :call s:BufSurfDelete(expand('<abuf>'))
+  autocmd BufDelete * :windo call s:BufSurfDelete(expand('<abuf>'))
+  autocmd BufWipeout * :windo call s:BufSurfDelete(expand('<abuf>'))
 augroup End
