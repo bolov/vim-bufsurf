@@ -51,9 +51,15 @@ function s:BufSurfForward()
     endif
 endfunction
 
+function s:BufSurfPrintHistory()
+  echomsg "history: (idx " . w:history_index . ") " . join(w:history, ";")
+endfunction
+
 " Add the given buffer number to the navigation history for the window
 " identified by winnr.
 function s:BufSurfAppend(bufnr)
+    echom "BufSurfAppend " . a:bufnr
+    call s:BufSurfPrintHistory()
     " In case the specified buffer should be ignored, do not append it to the
     " navigation history of the window.
     if s:BufSurfIsDisabled(a:bufnr)
@@ -97,17 +103,22 @@ function s:BufSurfAppend(bufnr)
     if !l:is_buffer_listed
         let w:history = insert(w:history, a:bufnr, w:history_index)
     endif
+
+    call s:BufSurfPrintHistory()
+    echom "end append"
 endfunction
 
 " Displays buffer navigation history for the current window.
 function s:BufSurfList()
     let l:buffer_names = []
+    let l:idx = 0
     for l:bufnr in w:history
         let l:buffer_name = bufname(l:bufnr)
-        if bufnr("%") == l:bufnr
-            let l:buffer_name .= "*"
+        if l:idx == w:history_index
+          let l:buffer_name .= l:buffer_name . "*"
         endif
         let l:buffer_names = l:buffer_names + [l:buffer_name]
+        let l:idx += 1
     endfor
     call s:BufSurfEcho("window buffer navigation history (* = current): " . join(l:buffer_names, ', '))
 endfunction
@@ -130,21 +141,26 @@ endfunction
 
 " Remove buffer with number bufnr from all navigation histories.
 function s:BufSurfDelete(bufnr)
+    echom "surf delete " . a:bufnr
+    echom "actually it is: " . expand('<afile>') . " - " . expand('<abuf>')
+    call s:BufSurfPrintHistory()
+
     if s:BufSurfIsDisabled(a:bufnr)
         return
     endif
 
-    echomsg "called bufsurfdeleted"
-    echomsg w:history
-
     " Remove the buffer from all window histories.
     call filter(w:history, 'v:val !=' . a:bufnr)
+
     echomsg join(w:history, ";")
 
     " In case the current window history index is no longer valid, move it within boundaries.
     if w:history_index >= len(w:history)
         let w:history_index = len(w:history) - 1
     endif
+
+    call s:BufSurfPrintHistory()
+    echo "end surf delete"
 endfunction
 
 " Echo a BufSurf message in the Vim status line.
@@ -161,5 +177,6 @@ augroup BufSurf
   autocmd!
   autocmd BufEnter * :call s:BufSurfAppend(winbufnr(winnr()))
   autocmd WinEnter * :call s:BufSurfAppend(winbufnr(winnr()))
-  autocmd BufWipeout * :call s:BufSurfDelete(winbufnr(winnr()))
+  " autocmd BufWipeout * :call s:BufSurfDelete(winbufnr(winnr()))
+  autocmd BufWipeout * :call s:BufSurfDelete(expand('<abuf>'))
 augroup End
