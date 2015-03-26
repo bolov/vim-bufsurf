@@ -134,8 +134,12 @@ function s:BufSurfDelete(bufnr)
         return
     endif
 
+    echomsg "called bufsurfdeleted"
+    echomsg w:history
+
     " Remove the buffer from all window histories.
     call filter(w:history, 'v:val !=' . a:bufnr)
+    echomsg join(w:history, ";")
 
     " In case the current window history index is no longer valid, move it within boundaries.
     if w:history_index >= len(w:history)
