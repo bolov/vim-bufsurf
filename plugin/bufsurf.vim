@@ -29,6 +29,9 @@ let s:disabled = 0
 
 " Open the previous buffer in the navigation history for the current window.
 function s:BufSurfBack()
+    if !empty(&buftype)
+        return
+    endif
     if w:history_index > 0
         let w:history_index -= 1
         let s:disabled = 1
@@ -42,6 +45,9 @@ endfunction
 
 " Open the next buffer in the navigation history for the current window.
 function s:BufSurfForward()
+    if !empty(&buftype)
+        return
+    endif
     if w:history_index < len(w:history) - 1
         let w:history_index += 1
         let s:disabled = 1
@@ -57,7 +63,8 @@ function s:BufSurfPrintHistory()
     if !exists('w:history_index')
       return
     endif
-  echomsg "history: (idx " . w:history_index . ") " . join(w:history, ";")
+  echomsg "[w" . winnr() . " b" . expand('<abuf>') . "] "
+        \ . "history: (idx " . w:history_index . ") " . join(w:history, ";")
 endfunction
 
 " Add the given buffer number to the navigation history for the window
@@ -68,6 +75,14 @@ function s:BufSurfAppend(bufnr)
     if s:BufSurfIsDisabled(a:bufnr)
         return
     endif
+
+    if !empty(&buftype)
+        return
+    endif
+
+    echomsg "[w" . winnr() . " b" . expand('<abuf>') . "] "
+          \ . "surf append"
+    call s:BufSurfPrintHistory()
 
     " In case no navigation history exists for the current window, initialize
     " the navigation history.
@@ -107,6 +122,10 @@ function s:BufSurfAppend(bufnr)
         let w:history = insert(w:history, a:bufnr, w:history_index)
     endif
 
+    call s:BufSurfPrintHistory()
+    echomsg "surf  del wnd" . winnr() . " b " . a:bufnr
+          \ . "end surf append"
+
 endfunction
 
 " Displays buffer navigation history for the current window.
@@ -140,12 +159,7 @@ function s:BufSurfIsDisabled(bufnr)
     return 0
 endfunction
 
-" Remove buffer with number bufnr from all navigation histories.
-function s:BufSurfDelete(bufnr)
-    if s:BufSurfIsDisabled(a:bufnr)
-        return
-    endif
-
+function s:BufSurfDeleteInWindow(bufnr)
     " Remove the buffer; update index
     let l:tail = filter(w:history[w:history_index + 1 : ], 'v:val != ' . a:bufnr)
     let l:head = filter(w:history[0 : w:history_index], 'v:val != ' . a:bufnr)
@@ -161,6 +175,28 @@ function s:BufSurfDelete(bufnr)
       call remove(w:history, w:history_index)
       let w:history_index -= 1
     endif
+endfunction
+
+" Remove buffer with number bufnr from all navigation histories.
+function s:BufSurfDelete(bufnr)
+    if s:BufSurfIsDisabled(a:bufnr)
+        return
+    endif
+
+    if !empty(&buftype)
+        return
+    endif
+
+    echomsg "[w" . winnr() . " b" . expand('<abuf>') . "] "
+          \ . "surf del"
+    call s:BufSurfPrintHistory()
+
+    windo call s:BufSurfDeleteInWindow(a:bufnr)
+
+
+    call s:BufSurfPrintHistory()
+    echomsg "surf  del wnd" . winnr() . " b " . a:bufnr
+          \ . "end surf del"
 
 endfunction
 
@@ -178,9 +214,11 @@ endfunction
 " Setup the autocommands that handle MRU buffer ordering per window.
 augroup BufSurf
   autocmd!
-  autocmd BufEnter * :call s:BufSurfAppend(winbufnr(winnr()))
-  autocmd WinEnter * :call s:BufSurfAppend(winbufnr(winnr()))
-  " autocmd BufWipeout * :call s:BufSurfDelete(winbufnr(winnr()))
-  autocmd BufDelete * :windo call s:BufSurfDelete(expand('<abuf>'))
-  autocmd BufWipeout * :windo call s:BufSurfDelete(expand('<abuf>'))
+
+  autocmd BufEnter,WinEnter *
+        \   call s:BufSurfAppend(expand('<abuf>'))
+
+  autocmd BufDelete,BufWipeout *
+        \   call s:BufSurfDelete(expand('<abuf>'))
+
 augroup End
