@@ -149,18 +149,31 @@ function s:BufSurfList()
 
     call s:CheckConsistency()
 
+    echon 'BufSurf: history: '
+
     let l:buffer_names = []
     let l:idx = 0
     for l:bufnr in w:history
         let l:buffer_name = bufname(l:bufnr + 0)
         if l:idx == w:history_index
-          let l:buffer_name .= "*"
+          if len(l:buffer_names) > 0
+            let l:s = join(l:buffer_names , ' , ') . ' , '
+            echon l:s
+          endif
+          echohl Search
+          echon l:buffer_name
+          echohl Normal
+          let l:buffer_names = []
+        else
+          let l:buffer_names = l:buffer_names + [l:buffer_name]
         endif
-        let l:buffer_names = l:buffer_names + [l:buffer_name]
         let l:idx += 1
     endfor
-    call s:BufSurfPrintHistory()
-    call s:BufSurfEcho("history: " . join(l:buffer_names, ', '), 0)
+
+    if len(l:buffer_names) > 0
+      let l:s =  ' , ' . join(l:buffer_names , ' , ')
+      echon l:s
+    endif
 endfunction
 
 " Removes the &bufnr from the history. Updates history_index
