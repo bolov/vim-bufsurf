@@ -86,11 +86,16 @@ function s:BufSurfPrintHistory()
         \ . "history: (idx " . w:history_index . ") " . join(w:history, ";")
 endfunction
 
-" initializez history. First entry is @bufnr. Next come all the other listed
-" buffers
-function s:InitHistory(bufnr)
+" initialises history. The only entry is @bufnr
+function s:InitHistoryAlone(bufnr)
   let w:history_index = 0
   let w:history = [a:bufnr]
+endfunction
+
+" initialises history. First entry is @bufnr. Next come all the other listed
+" buffers
+function s:InitHistoryAll(bufnr)
+  call InitHistoryAlone(a:bufnr)
 
   for l:i in range(1, bufnr("$"))
     if buflisted(l:i + 0) && l:i != a:bufnr
@@ -114,7 +119,7 @@ function s:BufSurfAppend(bufnr)
   endif
 
   if !exists('w:history_index')
-    call s:InitHistory(a:bufnr)
+    call s:InitHistoryAlone(a:bufnr)
     return
   endif
 
@@ -204,9 +209,9 @@ endfunction
 
 " Remove buffer with number bufnr from all navigation histories.
 function s:BufSurfDelete(bufnr)
-    if s:IsWindowDisabled()
-      return
-    endif
+    " if s:IsWindowDisabled()
+    "   return
+    " endif
 
     let l:curr_win = winnr()
     windo call s:BufSurfDeleteInWindow(a:bufnr)
